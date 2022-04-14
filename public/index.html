@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App Demo</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body>
+    <div class="flex items-center justify-center w-full h-screen bg-slate-700">
+        <form id="form-signin" class="w-1/2 max-w-md flex flex-col bg-slate-800 p-5 rounded-md">
+            <label for="inp-username" class="text-gray-400 font-light">Type in your Name</label>
+            <input id="inp-username"
+                class="text-gray-50 font-bold placeholder:text-gray-500 bg-transparent border-0 outline-0 text-xl"
+                placeholder="Username" required />
+            <button class="mt-12 text-gray-50 font-bold p-1 text-xs bg-blue-600 rounded-md">Submit</button>
+        </form>
+        <div id="chat" class="flex flex-col h-4/6 w-1/2 bg-gray-50 text-gray-700 rounded-md">
+            <section id="messages" class="flex-1 overflow-y-auto p-6"></section>
+            <form id="form-send-message" class="flex w-full p-3 bg-gray-100">
+                <input id="inp-message" class="flex-1 p-2 rounded-md" placeholder="Message" required />
+                <button class="text-gray-50 font-bold px-3 text-sm ml-3 bg-blue-600 rounded-md">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let signedInUsername = null;
+        const socket = io();
+
+        function hideElement(elementSelector) {
+            $(elementSelector).addClass('hidden');
+        }
+
+        function revealElement(elementSelector) {
+            $(elementSelector).removeClass('hidden');
+        }
+
+        function createMessageElementHTML({ username, message }) {
+            return `<span>
+                    <p class="font-bold break-words">${username}</p>
+                    <p class="break-words">${message}</p>
+                </span>`;
+        }
+
+        function appendMessageToChat(userMessage) {
+            const messageElement = $(createMessageElementHTML(userMessage))
+            $("#messages").append(messageElement);
+        }
+
+        function signIn(username) {
+            signedInUsername = username;
+            socket.emit('join-chat');
+        }
+
+        function listenSignIn() {
+            $("#form-signin").submit(function (e) {
+                e.preventDefault();
+
+                const username = $('#inp-username').val();
+                if (!username)
+                    return;
+                signIn(username);
+                tryToLoadChat();
+            });
+        }
+
+        function sockListenReceiveMessage() {
+            socket.on('receive-message', ((data) => {
+                console.log(data);
+                appendMessageToChat({ username: data.username, message: data.message });
+            }));
+        }
+
+        function sendMessage({ username, message }) {
+            console.log("Sending Message!");
+            socket.emit('send-message', { username, message });
+        }
+
+        function listenSendMessage() {
+            $('#form-send-message').submit(function (e) {
+                e.preventDefault();
+
+                const inputMessageElement = $("#inp-message");
+                const message = inputMessageElement.val();
+                inputMessageElement.val("");
+
+                sendMessage({
+                    username: signedInUsername, message
+                });
+            })
+        }
+
+        function loadChat() {
+            revealElement('#chat');
+        }
+
+        function loadSignIn() {
+            revealElement('#form-signin');
+        }
+
+        function tryToLoadChat() {
+            hideElement('#form-signin');
+            hideElement('#chat');
+            if (signedInUsername != null && signedInUsername != undefined) {
+                return loadChat();
+            }
+            loadSignIn();
+        }
+
+        $(document).ready(function () {
+            tryToLoadChat();
+            listenSignIn();
+            listenSendMessage();
+            sockListenReceiveMessage();
+        });
+    </script>
+</body>
+
+</html>
